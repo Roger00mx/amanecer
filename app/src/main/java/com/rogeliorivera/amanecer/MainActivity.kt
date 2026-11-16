@@ -564,8 +564,68 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            WideButton("🎵  Agregar canciones") { add() }
-            Text("Spotify: llega en la fase 2.", fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
+            WideButton("🎵  Agregar canciones del celular") { add() }
+            Spacer(Modifier.height(10.dp))
+            val src = Prefs.songSource(ctx)
+            Choice("📱  Usar canciones del celular", src == "local", { Prefs.setSongSource(ctx, "local"); refresh() })
+            Choice("🟢  Usar Spotify (Premium)", src == "spotify", { Prefs.setSongSource(ctx, "spotify"); refresh() })
+            if (src == "spotify") SpotifyBox(ctx)
+        }
+    }
+
+    @Composable
+    private fun SpotifyBox(ctx: Context) {
+        var link by remember { mutableStateOf("") }
+        val cur = Prefs.spotifyUri(ctx)
+        Text(
+            if (Prefs.spotifyConnected(ctx)) "✅  Conectado con Spotify" else "❌  Aún no conectado",
+            color = TextMain, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp)
+        )
+        WideButton(if (Prefs.spotifyConnected(ctx)) "🔄  Volver a conectar Spotify" else "🔗  Conectar con Spotify", primary = !Prefs.spotifyConnected(ctx)) {
+            SpotifyLink.connect(this, true) { remote, err ->
+                main.post {
+                    if (remote != null) {
+                        Prefs.setSpotifyConnected(ctx, true)
+                        com.spotify.android.appremote.api.SpotifyAppRemote.disconnect(remote)
+                        toast("¡Spotify conectado!")
+                    } else {
+                        Prefs.setSpotifyConnected(ctx, false)
+                        toast("No se pudo conectar: ${err ?: "error desconocido"}")
+                    }
+                    refresh()
+                }
+            }
+        }
+        Text(
+            "Elegido: " + SpotifyLink.describe(cur),
+            color = if (cur != null) Orange else Muted, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp)
+        )
+        OutlinedTextField(
+            value = link,
+            onValueChange = { link = it },
+            singleLine = true,
+            label = { Text("Pega aquí el enlace de tu playlist, álbum o canción") },
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+        )
+        Text(
+            "En Spotify: toca ⋯ en la playlist → Compartir → Copiar enlace. Si no funciona Spotify, sonará una canción de tu celular.",
+            fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 4.dp)
+        )
+        WideButton("Guardar enlace") {
+            val uri = SpotifyLink.toUri(link)
+            if (uri == null) toast("Ese enlace no parece de Spotify.")
+            else {
+                Prefs.setSpotifyUri(ctx, uri)
+                toast("Guardado: ${SpotifyLink.describe(uri)}")
+                refresh()
+            }
+        }
+        if (cur != null) {
+            WideButton("▶  Probar en Spotify") {
+                SpotifyLink.play(this, cur) { ok, err ->
+                    main.post { toast(if (ok) "Sonando en Spotify 🎵" else "No se pudo: ${err ?: "error"}") }
+                }
+            }
         }
     }
 
@@ -638,7 +698,8 @@ class MainActivity : ComponentActivity() {
                     "Noticias: Google Noticias.\n" +
                     "Versículos: Reina-Valera 1909 (dominio público).\n" +
                     "Gallo: \"Dawn Rooster Crow\" de BudgetPixel AI (CC BY 4.0).\n" +
-                    "Música: Kevin MacLeod, incompetech.com (CC BY 4.0).",
+                    "Música: Kevin MacLeod, incompetech.com (CC BY 4.0).\n" +
+                    "Spotify es una marca de Spotify AB.",
                 fontSize = 12.sp, color = Muted, lineHeight = 17.sp
             )
         }

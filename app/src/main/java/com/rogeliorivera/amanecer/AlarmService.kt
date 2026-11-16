@@ -346,6 +346,7 @@ class AlarmService : Service() {
                 t.speak(s.text, TextToSpeech.QUEUE_FLUSH, null, id)
             }
             is Step.Play -> play(s)
+            is Step.Spotify -> playSpotify(s)
         }
     }
 
@@ -366,6 +367,35 @@ class AlarmService : Service() {
             if (s.maxMs > 0) fadeOutAt(mp, s.maxMs)
         } catch (e: Exception) {
             main.post { next() }
+        }
+    }
+
+    private fun playSpotify(s: Step.Spotify) {
+        currentId = null
+        nowPlaying = SpotifyLink.describe(s.uri)
+        notifyUi()
+        SpotifyLink.play(applicationContext, s.uri) { ok, _ ->
+            main.post {
+                if (state != "running") return@post
+                if (ok) {
+                    // Spotify sigue sonando por su cuenta; Amanecer termina su rutina.
+                    goForeground("🎵 Sonando en Spotify", "¡Que tengas un excelente día!", false)
+                    main.postDelayed({ if (state == "running") finish() }, 4000)
+                } else if (s.fallback != null) {
+                    play(Step.Play(Uri.parse(s.fallback.uri), 0, s.fallback.name))
+                } else {
+                    // Último intento: abrir Spotify directamente
+                    try {
+                        startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(s.uri))
+                                .setPackage("com.spotify.music")
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    } catch (e: Exception) {
+                    }
+                    next()
+                }
+            }
         }
     }
 

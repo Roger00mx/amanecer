@@ -89,6 +89,15 @@ object Prefs {
         null
     }
 
+    // ---- Spotify ----
+    /** local | spotify */
+    fun songSource(c: Context): String = sp(c).getString("songSource", "local") ?: "local"
+    fun setSongSource(c: Context, v: String) = sp(c).edit().putString("songSource", v).apply()
+    fun spotifyUri(c: Context): String? = sp(c).getString("spotifyUri", null)
+    fun setSpotifyUri(c: Context, v: String?) = sp(c).edit().putString("spotifyUri", v).apply()
+    fun spotifyConnected(c: Context) = sp(c).getBoolean("spotifyConnected", false)
+    fun setSpotifyConnected(c: Context, v: Boolean) = sp(c).edit().putBoolean("spotifyConnected", v).apply()
+
     // ---- Primera vez ----
     fun onboarded(c: Context) = sp(c).getBoolean("onboarded", false)
     fun setOnboarded(c: Context) = sp(c).edit().putBoolean("onboarded", true).apply()

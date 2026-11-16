@@ -12,6 +12,7 @@ import kotlin.random.Random
 sealed class Step {
     data class Speak(val text: String) : Step()
     data class Play(val uri: Uri, val maxMs: Long, val title: String) : Step()
+    data class Spotify(val uri: String, val fallback: Song?) : Step()
 }
 
 object Secciones {
@@ -85,7 +86,11 @@ object Briefing {
 
         // 7. Canción final
         val song = if (on("cancion")) songOfDay(c, today) else null
-        if (song != null) {
+        val spotify = Prefs.spotifyUri(c)
+        if (on("cancion") && Prefs.songSource(c) == "spotify" && spotify != null) {
+            steps += Step.Speak("Y para cerrar, te dejo tu música en Spotify. ¡Que tengas un excelente día, $name!")
+            steps += Step.Spotify(spotify, song)
+        } else if (song != null) {
             steps += Step.Speak("Y para cerrar, aquí va tu canción. ¡Que tengas un excelente día, $name!")
             steps += Step.Play(Uri.parse(song.uri), 0, song.name)
         } else {
@@ -126,6 +131,7 @@ object Briefing {
         when (it) {
             is Step.Speak -> it.text
             is Step.Play -> "🎵 ${it.title}"
+            is Step.Spotify -> "🎵 ${SpotifyLink.describe(it.uri)}"
         }
     }
 }
