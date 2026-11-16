@@ -1,0 +1,44 @@
+name: Descargar sonidos con licencia libre
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/assets.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar
+        run: |
+          mkdir -p assets-src
+          cd assets-src
+          : > report.txt
+          get() {
+            if curl -fsSL --max-time 60 -o "$1" "$2"; then
+              echo "OK $1 $(stat -c %s "$1") $2" >> report.txt
+            else
+              echo "FAIL $1 $2" >> report.txt; rm -f "$1"
+            fi
+          }
+          # Gallo: "Dawn Rooster Crow" by BudgetPixel AI, CC BY 4.0
+          get gallo.mp3 "https://cdn.budgetpixel.com/audio-library/sfx/crisp-loud-bright-clear-rooster-l3s7ag.mp3"
+          # Música: Kevin MacLeod (incompetech.com), CC BY 4.0
+          B="https://incompetech.com/music/royalty-free/mp3-royaltyfree"
+          for t in "Inspired" "Carefree" "Happy Alley" "Life of Riley" "Wallpaper" "Pixelland" "Funkorama" "Bright Wish" "Monkeys Spinning Monkeys" "Fluffing a Duck" "Sunshine A" "Hyperfun"; do
+            f="$(echo "$t" | tr ' ' '_' ).mp3"
+            get "$f" "$B/$(echo "$t" | sed 's/ /%20/g').mp3"
+          done
+          cat report.txt
+      - name: Guardar en el repositorio
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add assets-src
+          git commit -m "Sonidos descargados" || echo "sin cambios"
+          git push
