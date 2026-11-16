@@ -16,6 +16,9 @@ android {
         targetSdk = 36
         versionCode = runNumber
         versionName = "1.0.$runNumber"
+        manifestPlaceholders["redirectSchemeName"] = "amanecer"
+        manifestPlaceholders["redirectHostName"] = "spotify-callback"
+        manifestPlaceholders["redirectPathPattern"] = ".*"
     }
 
     signingConfigs {
@@ -63,4 +66,5 @@ dependencies {
     // Spotify App Remote SDK (github.com/spotify/android-sdk)
     implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.spotify.android:auth:2.1.0")
 }

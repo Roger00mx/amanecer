@@ -19,7 +19,6 @@ import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -80,6 +79,52 @@ class MainActivity : ComponentActivity() {
     private var preview: MediaPlayer? = null
     private val main = Handler(Looper.getMainLooper())
     private val listener: () -> Unit = { tick++ }
+
+    private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        Ubicacion.refresh(this); refresh()
+    }
+
+    private val songsLauncher = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) {
+            val now = Prefs.songs(this).toMutableList()
+            uris.forEach { u ->
+                keep(u)
+                if (now.none { it.uri == u.toString() }) now += Song(u.toString(), displayName(u))
+            }
+            Prefs.setSongs(this, now)
+            refresh()
+        }
+    }
+
+    private val soundLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
+        if (u != null) {
+            keep(u)
+            Prefs.setCustomSound(this, Song(u.toString(), displayName(u)))
+            Prefs.setAlarmSound(this, "custom")
+            refresh()
+        }
+    }
+
+    private val spotifyLogin = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        val authErr = SpotifyLink.loginResult(res.resultCode, res.data)
+        if (authErr != null) {
+            toast("Spotify no autorizó: $authErr")
+        } else {
+            SpotifyLink.connect(this, true) { remote, err ->
+                main.post {
+                    if (remote != null) {
+                        Prefs.setSpotifyConnected(this, true)
+                        com.spotify.android.appremote.api.SpotifyAppRemote.disconnect(remote)
+                        toast("¡Spotify conectado!")
+                    } else {
+                        Prefs.setSpotifyConnected(this, false)
+                        toast("No se pudo conectar: ${err ?: "error desconocido"}")
+                    }
+                    refresh()
+                }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -234,28 +279,6 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun SettingsScreen() {
         val ctx = LocalContext.current
-        val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            Ubicacion.refresh(ctx); refresh()
-        }
-        val songsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            if (uris.isNotEmpty()) {
-                val now = Prefs.songs(ctx).toMutableList()
-                uris.forEach { u ->
-                    keep(u)
-                    if (now.none { it.uri == u.toString() }) now += Song(u.toString(), displayName(u))
-                }
-                Prefs.setSongs(ctx, now)
-                refresh()
-            }
-        }
-        val soundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
-            if (u != null) {
-                keep(u)
-                Prefs.setCustomSound(ctx, Song(u.toString(), displayName(u)))
-                Prefs.setAlarmSound(ctx, "custom")
-                refresh()
-            }
-        }
         if (!Prefs.onboarded(ctx)) {
             Prefs.setOnboarded(ctx)
             val need = neededPerms()
@@ -582,19 +605,8 @@ class MainActivity : ComponentActivity() {
             color = TextMain, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp)
         )
         WideButton(if (Prefs.spotifyConnected(ctx)) "🔄  Volver a conectar Spotify" else "🔗  Conectar con Spotify", primary = !Prefs.spotifyConnected(ctx)) {
-            SpotifyLink.connect(this, true) { remote, err ->
-                main.post {
-                    if (remote != null) {
-                        Prefs.setSpotifyConnected(ctx, true)
-                        com.spotify.android.appremote.api.SpotifyAppRemote.disconnect(remote)
-                        toast("¡Spotify conectado!")
-                    } else {
-                        Prefs.setSpotifyConnected(ctx, false)
-                        toast("No se pudo conectar: ${err ?: "error desconocido"}")
-                    }
-                    refresh()
-                }
-            }
+            if (!SpotifyLink.isInstalled(ctx)) toast("Primero instala Spotify e inicia sesión.")
+            else spotifyLogin.launch(SpotifyLink.loginIntent(this))
         }
         Text(
             "Elegido: " + SpotifyLink.describe(cur),

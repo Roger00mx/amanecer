@@ -6,6 +6,9 @@ import android.os.Looper
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
 import com.spotify.android.appremote.api.SpotifyAppRemote
+import com.spotify.sdk.android.auth.AuthorizationClient
+import com.spotify.sdk.android.auth.AuthorizationRequest
+import com.spotify.sdk.android.auth.AuthorizationResponse
 
 /** Conexión con la app de Spotify (App Remote SDK). Requiere Spotify Premium. */
 object SpotifyLink {
@@ -13,6 +16,24 @@ object SpotifyLink {
     const val REDIRECT_URI = "amanecer://spotify-callback"
 
     private val main = Handler(Looper.getMainLooper())
+
+    /** Pantalla de Spotify para que el usuario autorice a Amanecer. */
+    fun loginIntent(a: android.app.Activity): android.content.Intent {
+        val req = AuthorizationRequest.Builder(CLIENT_ID, AuthorizationResponse.Type.TOKEN, REDIRECT_URI)
+            .setScopes(arrayOf("app-remote-control", "user-modify-playback-state"))
+            .build()
+        return AuthorizationClient.createLoginActivityIntent(a, req)
+    }
+
+    /** null si salió bien; si no, el mensaje de error. */
+    fun loginResult(resultCode: Int, data: android.content.Intent?): String? {
+        val r = AuthorizationClient.getResponse(resultCode, data)
+        return when (r.type) {
+            AuthorizationResponse.Type.TOKEN -> null
+            AuthorizationResponse.Type.ERROR -> r.error ?: "error"
+            else -> "cancelado"
+        }
+    }
 
     fun isInstalled(c: Context): Boolean = try {
         SpotifyAppRemote.isSpotifyInstalled(c)
